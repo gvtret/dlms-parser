@@ -238,6 +238,14 @@ class BERDecoder(BaseDecoder):
                 item['name'] = "AARE-apdu" # Override name
                 item['children'], ctx_aare = self.decode_aare(value_bytes)
                 context_update.update(ctx_aare)
+            elif tag_class == 1 and tag_number == 2:  # RLRQ APDU (Application Class, Tag 2)
+                item['name'] = "RLRQ-apdu"
+                item['children'], ctx_rlrq = self.decode_rlrq(value_bytes)
+                context_update.update(ctx_rlrq)
+            elif tag_class == 1 and tag_number == 3:  # RLRE APDU (Application Class, Tag 3)
+                item['name'] = "RLRE-apdu"
+                item['children'], ctx_rlre = self.decode_rlre(value_bytes)
+                context_update.update(ctx_rlre)
             # DLMS Data CHOICE: array [1] and structure [2] are context-specific, constructed.
             # These tags are used within the `Data ::= CHOICE { ... }` structure in DLMS.
             elif tag_class == 2 and tag_number == 1 and constructed: # Data array: [CONTEXT 1] IMPLICIT SEQUENCE OF Data
@@ -555,6 +563,105 @@ class BERDecoder(BaseDecoder):
         children, context_update, _ = self._decode_tags_from_data(data, parent_expected_tags_for_child=aare_field_definitions)
         return children, context_update
 
+    # RLRQ APDU: [APPLICATION 2] IMPLICIT ReleaseRequestReason OPTIONAL
+    rlrq_field_definitions = {
+        0: "reason [0]" # ReleaseRequestReason OPTIONAL
+        # user-information [30] is also possible as per ACSE, but typically not used in basic RLRQ for DLMS
+        # If user-information were present, it would be:
+        # 30: "user-information [30]"
+    }
+
+    def decode_rlrq(self, data: bytes) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Decodes the content of an RLRQ (Release Request) APDU.
+        The RLRQ APDU itself is [APPLICATION 2] IMPLICIT SEQUENCE {...fields...}.
+        This method receives the content of that SEQUENCE.
+        The main field is an optional 'reason'.
+
+        Args:
+            data: The byte string representing the content of the RLRQ SEQUENCE.
+
+        Returns:
+            A tuple containing:
+            - A list of decoded child items (fields of the RLRQ).
+            - A context dictionary (currently empty).
+        """
+        children, context_update, _ = self._decode_tags_from_data(data, parent_expected_tags_for_child=self.rlrq_field_definitions)
+        return children, context_update
+
+    # RLRE APDU: [APPLICATION 3] IMPLICIT ReleaseResponseReason OPTIONAL
+    rlre_field_definitions = {
+        0: "reason [0]", # ReleaseResponseReason OPTIONAL
+        30: "user-information [30]" # User-information OPTIONAL
+    }
+
+    def decode_rlre(self, data: bytes) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Decodes the content of an RLRE (Release Response) APDU.
+        The RLRE APDU itself is [APPLICATION 3] IMPLICIT SEQUENCE {...fields...}.
+        This method receives the content of that SEQUENCE.
+        Fields are optional 'reason' and 'user-information'.
+
+        Args:
+            data: The byte string representing the content of the RLRE SEQUENCE.
+
+        Returns:
+            A tuple containing:
+            - A list of decoded child items (fields of the RLRE).
+            - A context dictionary (currently empty).
+        """
+        children, context_update, _ = self._decode_tags_from_data(data, parent_expected_tags_for_child=self.rlre_field_definitions)
+        return children, context_update
+
+    # RLRQ APDU: [APPLICATION 2] IMPLICIT ReleaseRequestReason OPTIONAL
+    rlrq_field_definitions = {
+        0: "reason [0]", # ReleaseRequestReason OPTIONAL
+        # user-information [30] is also possible as per ACSE, but typically not used in basic RLRQ for DLMS
+        30: "user-information [30]" # User-information OPTIONAL (ACSE standard)
+    }
+
+    def decode_rlrq(self, data: bytes) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Decodes the content of an RLRQ (Release Request) APDU.
+        The RLRQ APDU itself is [APPLICATION 2] IMPLICIT SEQUENCE {...fields...}.
+        This method receives the content of that SEQUENCE.
+        Fields are optional 'reason' and 'user-information'.
+
+        Args:
+            data: The byte string representing the content of the RLRQ SEQUENCE.
+
+        Returns:
+            A tuple containing:
+            - A list of decoded child items (fields of the RLRQ).
+            - A context dictionary (currently empty).
+        """
+        children, context_update, _ = self._decode_tags_from_data(data, parent_expected_tags_for_child=self.rlrq_field_definitions)
+        return children, context_update
+
+    # RLRE APDU: [APPLICATION 3] IMPLICIT ReleaseResponseReason OPTIONAL
+    rlre_field_definitions = {
+        0: "reason [0]", # ReleaseResponseReason OPTIONAL
+        30: "user-information [30]" # User-information OPTIONAL
+    }
+
+    def decode_rlre(self, data: bytes) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Decodes the content of an RLRE (Release Response) APDU.
+        The RLRE APDU itself is [APPLICATION 3] IMPLICIT SEQUENCE {...fields...}.
+        This method receives the content of that SEQUENCE.
+        Fields are optional 'reason' and 'user-information'.
+
+        Args:
+            data: The byte string representing the content of the RLRE SEQUENCE.
+
+        Returns:
+            A tuple containing:
+            - A list of decoded child items (fields of the RLRE).
+            - A context dictionary (currently empty).
+        """
+        children, context_update, _ = self._decode_tags_from_data(data, parent_expected_tags_for_child=self.rlre_field_definitions)
+        return children, context_update
+
 # Add the __main__ block for testing
 if __name__ == '__main__':
     decoder = BERDecoder()
@@ -617,7 +724,7 @@ if __name__ == '__main__':
 
     # Test 5: Empty SEQUENCE
     run_test("Empty SEQUENCE", "3000")
-    
+
     # Test 6: SEQUENCE with NULL
     run_test("SEQUENCE with NULL", "30020500") # SEQUENCE { NULL }
 
@@ -647,7 +754,7 @@ if __name__ == '__main__':
     structure_content_hex = "04024142" + "0500"
     structure_tlv_hex = "A2" + ("%02X" % (len(structure_content_hex)//2)) + structure_content_hex
     run_test("DLMS Data structure {\"AB\", null}", structure_tlv_hex)
-    
+
     # Test 12: Empty DLMS Data array
     empty_array_hex = "A100" # Tag [1], Context-specific, Constructed, Length 0
     run_test("Empty DLMS Data array", empty_array_hex)
@@ -687,5 +794,31 @@ if __name__ == '__main__':
     compact_array_content_empty_hex = contents_desc_field_empty_arr_hex + array_contents_field_empty_hex
     compact_array_tlv_empty_hex = "B3" + ("%02X" % (len(compact_array_content_empty_hex)//2)) + compact_array_content_empty_hex
     run_test("Empty DLMS Compact Array of Integers", compact_array_tlv_empty_hex)
+
+    # Test 17: RLRQ APDU with reason normal (0)
+    # RLRQ-apdu ::= [APPLICATION 2] IMPLICIT SEQUENCE { reason [0] IMPLICIT ReleaseRequestReason OPTIONAL }
+    # ReleaseRequestReason ::= ENUMERATED { normal(0), urgent(1), user-defined(2) }
+    # Reason [0] (ENUMERATED 0) -> BER for ENUM 0: 0A0100. Field: 80030A0100 (Context 0, Prim, Len 3, Val is TLV of ENUM)
+    # According to ASN.1 for IMPLICIT, the context tag replaces the universal tag.
+    # So, reason [0] IMPLICIT ENUMERATED(0) is: 80 01 00
+    rlrq_content_normal_hex = "800100"
+    rlrq_apdu_normal_hex = "62" + ("%02X" % (len(rlrq_content_normal_hex)//2)) + rlrq_content_normal_hex # App 2, Constructed
+    run_test("RLRQ APDU (Normal)", rlrq_apdu_normal_hex)
+
+    # Test 18: RLRE APDU with reason normal (0)
+    # RLRE-apdu ::= [APPLICATION 3] IMPLICIT SEQUENCE { reason [0] IMPLICIT ReleaseResponseReason OPTIONAL, ...}
+    # ReleaseResponseReason ::= ENUMERATED { normal(0), not-finished(1), user-defined(2) }
+    # Reason [0] (ENUMERATED 0) -> 800100
+    rlre_content_normal_hex = "800100"
+    rlre_apdu_normal_hex = "63" + ("%02X" % (len(rlre_content_normal_hex)//2)) + rlre_content_normal_hex # App 3, Constructed
+    run_test("RLRE APDU (Normal)", rlre_apdu_normal_hex)
+
+    # Test 19: RLRQ APDU - no reason (empty sequence for RLRQ content)
+    rlrq_apdu_no_reason_hex = "6200" # App 2, Constructed, Length 0
+    run_test("RLRQ APDU (No Reason)", rlrq_apdu_no_reason_hex)
+
+    # Test 20: RLRE APDU - no reason, no user-info (empty sequence for RLRE content)
+    rlre_apdu_empty_hex = "6300" # App 3, Constructed, Length 0
+    run_test("RLRE APDU (Empty)", rlre_apdu_empty_hex)
 
     print("\n--- BER Decoder Test Suite Complete ---")
